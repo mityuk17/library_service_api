@@ -44,14 +44,14 @@ async def create_tables():
 async def get_user(user_id=None, login=None) -> User:
     if user_id:
         query = '''SELECT * FROM users WHERE id = :id;'''
-        result = await database.fetch_all(query=query, values={'id': user_id})
+        result = await database.fetch_one(query=query, values={'id': user_id})
         if result:
-            return User(*result[0])
+            return User(*result)
     if login:
         query = '''SELECT * FROM users WHERE login = :login;'''
-        result = await database.fetch_all(query=query, values={'login': login})
+        result = await database.fetch_one(query=query, values={'login': login})
         if result:
-            return User(*result[0])
+            return User(*result)
     return None
 
 
@@ -80,14 +80,14 @@ async def delete_user(user_id: int):
 async def get_book(book_id=None, book_name=None) -> Book:
     if book_id:
         query = '''SELECT * FROM books WHERE id = :id;'''
-        result = await database.fetch_all(query=query, values={'id': book_id})
+        result = await database.fetch_one(query=query, values={'id': book_id})
         if result:
-            return Book(*result[0])
+            return Book(*result)
     if book_name:
         query = '''SELECT * FROM books WHERE name = :name;'''
-        result = await database.fetch_all(query=query, values={'name': book_name})
+        result = await database.fetch_one(query=query, values={'name': book_name})
         if result:
-            return Book(*result[0])
+            return Book(*result)
     return None
 
 
@@ -133,14 +133,14 @@ async def delete_book(book_id: int):
 async def get_genre(genre_id=None, genre_name=None) -> Genre:
     if genre_id:
         query = '''SELECT * FROM genres WHERE id = :id;'''
-        result = await database.fetch_all(query=query, values={'id': genre_id})
+        result = await database.fetch_one(query=query, values={'id': genre_id})
         if result:
-            return Genre(*result[0])
+            return Genre(*result)
     if genre_name:
         query = '''SELECT * FROM genres WHERE name = :name;'''
-        result = await database.fetch_all(query=query, values={'name': genre_name})
+        result = await database.fetch_one(query=query, values={'name': genre_name})
         if result:
-            return Genre(*result[0])
+            return Genre(*result)
     return None
 
 
@@ -153,14 +153,14 @@ async def insert_genre(name: str) -> Genre:
 async def get_author(author_id=None, author_name=None) -> Author:
     if author_id:
         query = '''SELECT * FROM authors WHERE id = :id;'''
-        result = await database.fetch_all(query=query, values={'id': author_id})
+        result = await database.fetch_one(query=query, values={'id': author_id})
         if result:
-            return Author(*result[0])
+            return Author(*result)
     if author_name:
         query = '''SELECT * FROM authors WHERE name = :name;'''
-        result = await database.fetch_all(query=query, values={'name': author_name})
+        result = await database.fetch_one(query=query, values={'name': author_name})
         if result:
-            return Author(*result[0])
+            return Author(*result)
     return None
 
 
@@ -173,14 +173,14 @@ async def insert_author(name: str) -> Author:
 async def get_publisher(publisher_id=None, publisher_name=None) -> Publisher:
     if publisher_id:
         query = '''SELECT * FROM publishers WHERE id = :id;'''
-        result = await database.fetch_all(query=query, values={'id': publisher_id})
+        result = await database.fetch_one(query=query, values={'id': publisher_id})
         if result:
-            return Publisher(*result[0])
+            return Publisher(*result)
     if publisher_name:
         query = '''SELECT * FROM publishers WHERE name = :name;'''
-        result = await database.fetch_all(query=query, values={'name': publisher_name})
+        result = await database.fetch_one(query=query, values={'name': publisher_name})
         if result:
-            return Publisher(*result[0])
+            return Publisher(*result)
     return None
 
 
