@@ -1,9 +1,10 @@
-import json
 import time
 import fastapi
-from fastapi import FastAPI, Request, HTTPException
-import db
+import uvicorn
 
+from fastapi import FastAPI, HTTPException, Response
+import db
+import models
 
 app = FastAPI()
 
@@ -24,367 +25,230 @@ async def root():
     return {"status": "OK"}
 
 
+"""
+Admin methods
+"""
+
+
 @app.get('/api/admin/users')
-async def get_users(request: Request):
+async def get_users(authorization: models.Authorization):
     """
-    Get all users
-    :param request: Request object with json(required params: login, password)
-    :return:list of users
+    Get information about all users
+    :param authorization: login, password
+    :return: users - list of User objects
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    admin = await db.get_user(login=login)
-    if not admin:
-        return HTTPException(status_code=404, detail='Admin not found')
-    if not admin.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if admin.role != 'admin':
-        return HTTPException(status_code=403, detail='You are not an admin')
+    authorized_user = await db.authorize(authorization, 'admin')
+    if not authorized_user:
+        return HTTPException(status_code=401)
     users = await db.get_users()
-    return [user.to_data_dict() for user in users]
+    return users
 
 
 @app.post('/api/admin/users')
-async def create_user(request: Request):
+async def create_user(new_user: models.NewUserData):
     """
-    Create a new User object
-    :param request: Request object with json(required params: login, password, new_user_data)
+    Creates a new user
+    :param new_user: admin_authorization(models.Authorization) and new user data
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    admin = await db.get_user(login=login)
-    if not admin:
-        return HTTPException(status_code=404, detail='Admin not found')
-    if not admin.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if admin.role != 'admin':
-        return HTTPException(status_code=403, detail='You are not an admin')
-    new_user_data = data.get('new_user_data')
-    if not new_user_data:
-        return HTTPException(status_code=400, detail='No new user data')
-    await db.insert_user(new_user_data)
-    return fastapi.Response()
+    authorized_user = await db.authorize(new_user.authorization, 'admin')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    await db.insert_user(new_user)
+    return Response()
 
 
 @app.put('/api/admin/users')
-async def change_user_data(request: Request):
+async def change_user_data(updated_user_data: models.UpdatedUserData):
     """
-    Changes User object's fields' values
-    :param request: Request object with json(required params: login, password, user_data)
+    Updates User's fields' values
+    :param updated_user_data: authorization(models.Authorization) and updated user data
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    admin = await db.get_user(login=login)
-    if not admin:
-        return HTTPException(status_code=404, detail='User not found')
-    if not admin.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if admin.role != 'admin':
-        return HTTPException(status_code=403, detail='You are not an admin')
-    user_data = data.get('user_data')
-    if not user_data:
-        return HTTPException(status_code=400, detail='No user data')
-    user_id = user_data.get('id')
-    if not user_id:
-        return HTTPException(status_code=400, detail='No user id')
-    user = await db.get_user(user_id=user_id)
+    authorized_user = await db.authorize(updated_user_data.authorization, 'admin')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    user = await db.get_user_by_id(updated_user_data.id)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
-    user = user.to_data_dict()
-    for item in user_data:
-        user[item] = user_data[item]
-    del user['role']
-    await db.update_user(user)
-    return fastapi.Response()
+    updated_user = models.User.from_dict(user.dict() | updated_user_data.dict())
+    await db.update_user(updated_user)
+    return Response()
 
 
-@app.get('/api/admin/users/{user_id}')
-async def get_user_info(user_id: int, request: Request):
+@app.get('/api/admin/users/{user_id}', response_model=models.User)
+async def get_user_info(user_id: int, authorization: models.Authorization):
     """
-    Gets user by id
+    Gets user information by id
     :param user_id:
-    :param request: Request object with json(required params: login, password)
-    :return: dict with User params
+    :param authorization: login and password
+    :return: models.User
     """
-    try:
-        print(await request.body())
-        data = await request.json()
-
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    admin = await db.get_user(login=login)
-    print(admin)
-    if not admin:
-        return HTTPException(status_code=404, detail='User not found')
-    if not admin.validate_password(password):
-        print(password, admin.password)
-        return HTTPException(status_code=401, detail='Invalid password')
-    if admin.role != 'admin':
-        return HTTPException(status_code=403, detail='You are not an admin')
-    user = await db.get_user(user_id)
+    authorized_user = await db.authorize(authorization, 'admin')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    user = await db.get_user_by_id(user_id)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
-    return user.to_data_dict()
+    return user
 
 
 @app.delete('/api/admin/users/{user_id}')
-async def delete_user(user_id: int, request: Request):
+async def delete_user(user_id: int, authorization: models.Authorization):
     """
     Deletes user from database
     :param user_id:
-    :param request: Request object with json(required params: login, password)
+    :param authorization: login and password
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    admin = await db.get_user(login=login)
-    if not admin:
-        return HTTPException(status_code=404, detail='User not found')
-    if not admin.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if admin.role != 'admin':
-        return HTTPException(status_code=403, detail='You are not an admin')
+    authorized_user = await db.authorize(authorization, 'admin')
+    if not authorized_user:
+        return HTTPException(status_code=401)
     await db.delete_user(user_id)
-    return fastapi.Response()
+    return Response()
+
+
+"""
+Librarian methods
+"""
 
 
 @app.post('/api/librarian/books')
-async def create_book(request: Request):
+async def create_book(new_book: models.NewBookData):
     """
-    Creates Book object
-    :param request: Request object with json(required params: login, password, new_book_data)
+
+    :param new_book: authorization and new book data
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='User not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='You are not a librarian')
-    new_book_data = data.get('new_book_data')
-    author_name = new_book_data.get('author')
-    author_id = await db.get_author(author_name=author_name)
-    if not author_id:
-        author_id = await db.insert_genre(author_name)
-    genre_name = new_book_data.get('genre')
-    genre_id = await db.get_genre(genre_name=genre_name)
-    if not genre_id:
-        genre_id = await db.insert_genre(genre_name)
-    publisher_name = new_book_data.get('publisher')
-    publisher_id = await db.get_publisher(publisher_name=publisher_name)
-    if not publisher_id:
-        publisher_id = await db.insert_publisher(publisher_name)
-    new_book_data['author_id'] = author_id
-    new_book_data['publisher_id'] = publisher_id
-    new_book_data['genre_id'] = genre_id
-    await db.insert_book(new_book_data)
-    return fastapi.Response()
+    authorized_user = await db.authorize(new_book.authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    author = await db.get_author_by_name(author_name=new_book.author)
+    author = author if author else await db.insert_author(new_book.author)
+    genre = await db.get_genre_by_name(genre_name=new_book.genre)
+    genre = genre if genre else await db.insert_genre(new_book.genre)
+    publisher = await db.get_publisher_by_name(publisher_name=new_book.publisher)
+    publisher = publisher if publisher else await db.insert_publisher(new_book.publisher)
+    new_book.author_id = author.id
+    new_book.genre_id = genre.id
+    new_book.publisher_id = publisher.id
+    await db.insert_book(new_book)
+    return Response()
 
 
-@app.put('/api/librarian/books')
-async def change_book_data(request: Request):
+@app.put('/api/librarian/books', response_model=models.Book)
+async def change_book_data(updated_book_data: models.UpdatedBookData):
     """
     Changes Book object's fields' values
-    :param request: Request object with json(required params: login, password, book_data)
+    :param updated_book_data: authorization and updated book data
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='User not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='You are not a librarian')
-    book_data = data.get('book_data')
-    if not book_data:
-        return HTTPException(status_code=400, detail='No book data provided')
-    user_id = book_data.get('id')
-    if not user_id:
-        return HTTPException(status_code=400, detail='No user id provided')
-    book = await db.get_book(book_id=user_id)
+    authorized_user = await db.authorize(updated_book_data.authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(updated_book_data.id)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
-    book = book.to_data_dict()
-    for item in book_data:
-        book[item] = book_data[item]
-    await db.update_user(book)
-    return fastapi.Response()
+    updated_book = models.Book.from_dict(book.dict() | updated_book_data.dict())
+    await db.update_book(updated_book)
+    return Response()
 
 
-@app.get('/api/librarian/books/{book_id}')
-async def get_book_info(book_id: int, request: Request):
+@app.get('/api/librarian/books/{book_id}', response_model=models.Book)
+async def get_book_info(book_id: int, authorization: models.Authorization):
     """
     Get book by id
     :param book_id:
-    :param request: Request object with json(required params: login, password)
+    :param authorization: login and password
     :return: dict with Book object params
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='User not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='You are not a librarian')
-    book = await db.get_book(book_id=book_id)
-    if book:
-        return book.to_data_dict()
-    else:
-        return HTTPException(status_code=400, detail='Book not found')
+    authorized_user = await db.authorize(authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(book_id=book_id)
+    if not book:
+        return HTTPException(status_code=404, detail='Book not found')
+    return book
 
 
 @app.delete('/api/librarian/books/{book_id}')
-async def delete_book(book_id: int, request: Request):
+async def delete_book(book_id: int, authorization: models.Authorization):
     """
     Delete book from database
     :param book_id:
-    :param request: Request object with json(required params: login, password)
+    :param authorization: login and password
     :return:
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='User not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='You are not an admin')
+    authorized_user = await db.authorize(authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
     await db.delete_book(book_id)
     return fastapi.Response()
 
 
-@app.get('/api/books')
-async def get_books():
+@app.get('/api/librarian/give_book')
+async def give_book(book_transaction: models.BookGiveTransaction):
     """
-    Gives all books
-    :return: list of dicts with Book object's params
+    Makes book unavailable for reserving of taking by users
+    :param book_transaction: authorization, book_id, user_id
+    :return: fastapi.Response()
     """
-    books = await db.search_books()
-    return [book.to_data_dict() for book in books]
-
-
-@app.get('/api/books/{book_id}')
-async def get_book(book_id: int):
-    """
-    Get book by its id
-    :param book_id:
-    :return: dict with Book object params
-    """
-    book = await db.get_book(book_id=book_id)
-    if book:
-        return book.to_data_dict()
-    else:
+    authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(book_transaction.book_id)
+    if not book:
         return HTTPException(status_code=404, detail='Book not found')
+    user = await db.get_user_by_id(book_transaction.user_id)
+    if not user:
+        return HTTPException(status_code=404, detail='User not found')
+    if book.is_reserved() and book.reserved_user_id != user.id:
+        return HTTPException(status_code=403, detail='Book is reserved by other user')
+    if not book.in_stock:
+        return HTTPException(status_code=403, detail='Book is not in stock')
+    book.in_stock = False
+    book.owner_id = user.id
+    await db.update_book(book_data=book)
+    return fastapi.Response()
 
 
-@app.get('/api/books/genre/{genre_id}')
-async def search_books_by_genre(genre_id: int):
+@app.get('/api/librarian/take_book')
+async def take_book(book_transaction: models.BookGetTransaction):
     """
-    Gets books specified by genre
-    :param genre_id:
-    :return: list of dicts with Book object's params
+    Makes book available for reserving and taking by users
+    :param book_transaction: authorization, book_id)
+    :return: fastapi.Response()
     """
-    genre = await db.get_genre(genre_id=genre_id)
-    if not genre:
-        return HTTPException(status_code=404, detail='Genre not found')
-    books = await db.search_books(genre_id=genre_id)
-    return [book.to_data_dict() for book in books]
+    authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(book_transaction.book_id)
+    if not book:
+        return HTTPException(status_code=404, detail='Book not found')
+    if book.in_stock:
+        return HTTPException(status_code=403, detail='Book is already in stock')
+    book.in_stock = True
+    await db.update_book(book)
+    return fastapi.Response()
 
 
-@app.get('/api/books/publisher/{publisher_id}')
-async def search_books_by_publisher(publisher_id: int):
-    """
-    Gets books specified by publisher
-    :param publisher_id:
-    :return: list of dicts with Book object's params
-    """
-    publisher = await db.get_publisher(publisher_id=publisher_id)
-    if not publisher:
-        return HTTPException(status_code=404, detail='Publisher not found')
-    books = await db.search_books(publisher_id=publisher_id)
-    return [book.to_data_dict() for book in books]
-
-
-@app.get('/api/books/author/{author_id}')
-async def search_books_by_author(author_id: int):
-    """
-    Gets books specified by author
-    :param author_id:
-    :return: list of dicts with Book object's params
-    """
-    author = await db.get_author(author_id=author_id)
-    if not author:
-        return HTTPException(status_code=404, detail='Publisher not found')
-    books = await db.search_books(author_id=author_id)
-    return [book.to_data_dict() for book in books]
+"""
+User methods
+"""
 
 
 @app.get('/api/reserve_book/{book_id}')
-async def reserve_book(book_id: int, request: Request):
+async def reserve_book(book_id: int, authorization: models.Authorization):
     """
     Reserves book and make it unavailable to reserve or take it by other users
     :param book_id:
-    :param request: Request object with json(required params: login, password)
-    :return:
+    :param authorization: login and password
+    :return: fastapi.Response()
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    user = await db.get_user(login=login)
-    if not user:
-        return HTTPException(status_code=404, detail='User not found')
-    if not user.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if user.role != 'user':
-        return HTTPException(status_code=403, detail='You are not a user')
-    book = await db.get_book(book_id=book_id)
+    authorized_user = await db.authorize(authorization, 'user')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(book_id=book_id)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     if book.is_reserved():
@@ -392,75 +256,75 @@ async def reserve_book(book_id: int, request: Request):
     if not book.in_stock:
         return HTTPException(status_code=403, detail='Book is not in stock')
     book.reserved_datetime = int(time.time())
-    book.reserved_user_id = user.id
-    await db.update_book(book_data=book.to_data_dict())
+    book.reserved_user_id = authorized_user.id
+    await db.update_book(book)
     return fastapi.Response()
 
 
-@app.get('/api/librarian/give_book')
-async def give_book(request: Request):
+"""
+Methods without authorization
+"""
+
+
+@app.get('/api/books', response_model=list[models.Book])
+async def get_books():
     """
-    Makes book unavailable for reserving of taking by users
-    :param request: Request object with json(required params: login, password, book_id, user_id)
-    :return:
+    Gives all books
+    :return: list of Book objects
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='Librarian not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='You are not a librarian')
-    book_id = data.get('book_id')
-    book = await db.get_book(book_id=book_id)
+    books = await db.search_books()
+    return books
+
+
+@app.get('/api/books/{book_id}', response_model=models.Book)
+async def get_book(book_id: int):
+    """
+    Get book by its id
+    :param book_id:
+    :return: Book object
+    """
+    book = await db.get_book_by_id(book_id=book_id)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
-    user_id = data.get('user_id')
-    user = await db.get_user(user_id)
-    if not user:
-        return HTTPException(status_code=404, detail='User not found')
-    if book.is_reserved() and book.reserved_user_id != user_id:
-        return HTTPException(status_code=403, detail='Book is reserved by other user')
-    if not book.in_stock:
-        return HTTPException(status_code=403, detail='Book is not in stock')
-    book.in_stock = False
-    book.owner_id = user_id
-    await db.update_book(book_data=book.to_data_dict())
-    return fastapi.Response()
 
 
-@app.get('/api/librarian/take_book')
-async def take_book(request: Request):
+@app.get('/api/books/genre/{genre_id}', response_model=list[models.Book])
+async def search_books_by_genre(genre_id: int):
     """
-    Makes book available for reserving and taking by users
-    :param request: Request object with json(required params: login, password, book_id)
-    :return:
+    Gets books specified by genre
+    :param genre_id:
+    :return: list of Book objects
     """
-    try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail='JSON not provided')
-    login = data.get('login')
-    password = data.get('password')
-    librarian = await db.get_user(login=login)
-    if not librarian:
-        return HTTPException(status_code=404, detail='Librarian not found')
-    if not librarian.validate_password(password):
-        return HTTPException(status_code=401, detail='Invalid password')
-    if librarian.role != 'librarian':
-        return HTTPException(status_code=403, detail='you are not a librarian')
-    book_id = data.get('book_id')
-    book = await db.get_book(book_id=book_id)
-    if not book:
-        return HTTPException(status_code=404, detail='Book not found')
-    if book.in_stock:
-        return HTTPException(status_code=403, detail='Book is already in stock')
-    book.in_stock = True
-    await db.update_book(book.to_data_dict())
-    return fastapi.Response()
+    genre = await db.get_genre_by_id(genre_id=genre_id)
+    if not genre:
+        return HTTPException(status_code=404, detail='Genre not found')
+    books = await db.search_books(filter_name='genre_id', filter_value=genre.id)
+    return books
+
+
+@app.get('/api/books/publisher/{publisher_id}', response_model=list[models.Book])
+async def search_books_by_publisher(publisher_id: int):
+    """
+    Gets books specified by publisher
+    :param publisher_id:
+    :return: list of Book objects
+    """
+    publisher = await db.get_publisher_by_id(publisher_id=publisher_id)
+    if not publisher:
+        return HTTPException(status_code=404, detail='Publisher not found')
+    books = await db.search_books(filter_name='publisher_id', filter_value=publisher.id)
+    return books
+
+
+@app.get('/api/books/author/{author_id}', response_model=list[models.Book])
+async def search_books_by_author(author_id: int):
+    """
+    Gets books specified by author
+    :param author_id:
+    :return: list of Book objects
+    """
+    author = await db.get_author_by_id(author_id=author_id)
+    if not author:
+        return HTTPException(status_code=404, detail='Publisher not found')
+    books = await db.search_books(filter_name='author_id', filter_value=author.id)
+    return books

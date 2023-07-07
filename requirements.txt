@@ -1,2 +1,0 @@
-databases==0.7.0
-fastapi==0.99.1
