@@ -258,8 +258,30 @@ async def reserve_book(book_id: int, authorization: models.Authorization):
     book.reserved_datetime = int(time.time())
     book.reserved_user_id = authorized_user.id
     await db.update_book(book)
-    return fastapi.Response()
+    return Response()
 
+
+@app.get('/api/unreserve_book/{book_id}')
+async def unreserve_book(book_id: int, authorization: models.Authorization):
+    """
+    Unreserve a book if it is reserved by user
+    :param book_id:
+    :param authorization:
+    :return:
+    """
+    authorized_user = await db.authorize(authorization, 'user')
+    if not authorized_user:
+        return HTTPException(status_code=401)
+    book = await db.get_book_by_id(book_id)
+    if not book:
+        return HTTPException(status_code=404, detail='Book not found')
+    if not book.is_reserved():
+        return HTTPException(status_code=403, detail='Book is not reserved')
+    if book.is_reserved() and book.reserved_user_id != authorized_user.id:
+        return HTTPException(status_code=403, detail='Book is reserved by another user')
+    book.reserved_datetime = 0
+    await db.update_book(book)
+    return Response()
 
 """
 Methods without authorization
