@@ -34,12 +34,12 @@ Admin methods
 """
 
 
-@app.get('/api/admin/users')
+@app.get('/api/admin/users', response_model=list[models.User])
 async def get_users(authorization: models.Authorization):
     """
     Get information about all users
     :param authorization: login, password
-    :return: users - list of User objects
+    :return: users list[User]
     """
     authorized_user = await db.authorize(authorization, 'admin')
     if not authorized_user:
@@ -48,28 +48,27 @@ async def get_users(authorization: models.Authorization):
     return users
 
 
-@app.post('/api/admin/users')
+@app.post('/api/admin/users', response_model=models.GenericResponse)
 async def create_user(new_user: models.NewUserData):
     """
     Creates a new user
     :param new_user: admin_authorization(models.Authorization) and new user data
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(new_user.authorization, 'admin')
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.insert_user(new_user)
     utils.notify_about_account_creation(email_controller, new_user)
+    return models.GenericResponse(result=True)
 
-    return Response()
 
-
-@app.put('/api/admin/users')
+@app.put('/api/admin/users', response_model=models.GenericResponse)
 async def change_user_data(updated_user_data: models.UpdatedUserData):
     """
     Updates User's fields' values
     :param updated_user_data: authorization(models.Authorization) and updated user data
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(updated_user_data.authorization, 'admin')
     if not authorized_user:
@@ -79,7 +78,7 @@ async def change_user_data(updated_user_data: models.UpdatedUserData):
         return HTTPException(status_code=404, detail='User not found')
     updated_user = models.User.from_dict(user.dict() | updated_user_data.dict())
     await db.update_user(updated_user)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
 @app.get('/api/admin/users/{user_id}', response_model=models.User)
@@ -99,19 +98,19 @@ async def get_user_info(user_id: int, authorization: models.Authorization):
     return user
 
 
-@app.delete('/api/admin/users/{user_id}')
+@app.delete('/api/admin/users/{user_id}', response_model=models.GenericResponse)
 async def delete_user(user_id: int, authorization: models.Authorization):
     """
     Deletes user from database
     :param user_id:
     :param authorization: login and password
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(authorization, 'admin')
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.delete_user(user_id)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
 """
@@ -119,12 +118,12 @@ Librarian methods
 """
 
 
-@app.post('/api/librarian/books')
+@app.post('/api/librarian/books', response_model=models.GenericResponse)
 async def create_book(new_book: models.NewBookData):
     """
-
+    Creates new book
     :param new_book: authorization and new book data
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(new_book.authorization, 'librarian')
     if not authorized_user:
@@ -139,15 +138,15 @@ async def create_book(new_book: models.NewBookData):
     new_book.genre_id = genre.id
     new_book.publisher_id = publisher.id
     await db.insert_book(new_book)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
-@app.put('/api/librarian/books', response_model=models.Book)
+@app.put('/api/librarian/books', response_model=models.GenericResponse)
 async def change_book_data(updated_book_data: models.UpdatedBookData):
     """
     Changes Book object's fields' values
     :param updated_book_data: authorization and updated book data
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(updated_book_data.authorization, 'librarian')
     if not authorized_user:
@@ -157,7 +156,7 @@ async def change_book_data(updated_book_data: models.UpdatedBookData):
         return HTTPException(status_code=404, detail='Book not found')
     updated_book = models.Book.from_dict(book.dict() | updated_book_data.dict())
     await db.update_book(updated_book)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
 @app.get('/api/librarian/books/{book_id}', response_model=models.Book)
@@ -166,7 +165,7 @@ async def get_book_info(book_id: int, authorization: models.Authorization):
     Get book by id
     :param book_id:
     :param authorization: login and password
-    :return: dict with Book object params
+    :return: models.Book
     """
     authorized_user = await db.authorize(authorization, 'librarian')
     if not authorized_user:
@@ -177,27 +176,27 @@ async def get_book_info(book_id: int, authorization: models.Authorization):
     return book
 
 
-@app.delete('/api/librarian/books/{book_id}')
+@app.delete('/api/librarian/books/{book_id}', response_model=models.GenericResponse)
 async def delete_book(book_id: int, authorization: models.Authorization):
     """
     Delete book from database
     :param book_id:
     :param authorization: login and password
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(authorization, 'librarian')
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.delete_book(book_id)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
-@app.get('/api/librarian/give_book')
+@app.get('/api/librarian/give_book', response_model=models.GenericResponse)
 async def give_book(book_transaction: models.BookGiveTransaction):
     """
     Makes book unavailable for reserving of taking by users
     :param book_transaction: authorization, book_id, user_id
-    :return: fastapi.Response()
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
     if not authorized_user:
@@ -215,15 +214,15 @@ async def give_book(book_transaction: models.BookGiveTransaction):
     book.in_stock = False
     book.owner_id = user.id
     await db.update_book(book_data=book)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
-@app.get('/api/librarian/take_book')
+@app.get('/api/librarian/take_book', response_model=models.GenericResponse)
 async def take_book(book_transaction: models.BookGetTransaction):
     """
     Makes book available for reserving and taking by users
     :param book_transaction: authorization, book_id)
-    :return: fastapi.Response()
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
     if not authorized_user:
@@ -235,7 +234,7 @@ async def take_book(book_transaction: models.BookGetTransaction):
         return HTTPException(status_code=403, detail='Book is already in stock')
     book.in_stock = True
     await db.update_book(book)
-    return Response()
+    return models.GenericResponse(result=True)
 
 
 """
@@ -243,13 +242,13 @@ User methods
 """
 
 
-@app.get('/api/reserve_book/{book_id}')
+@app.get('/api/reserve_book/{book_id}', response_model=models.GenericResponse)
 async def reserve_book(book_id: int, authorization: models.Authorization):
     """
     Reserves book and make it unavailable to reserve or take it by other users
     :param book_id:
     :param authorization: login and password
-    :return: fastapi.Response()
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(authorization, 'user')
     if not authorized_user:
@@ -264,16 +263,16 @@ async def reserve_book(book_id: int, authorization: models.Authorization):
     book.reserved_datetime = int(time.time())
     book.reserved_user_id = authorized_user.id
     await db.update_book(book)
-    return Response()
+    return models.GenericResponse
 
 
-@app.get('/api/unreserve_book/{book_id}')
+@app.get('/api/unreserve_book/{book_id}', response_model=models.GenericResponse)
 async def unreserve_book(book_id: int, authorization: models.Authorization):
     """
     Unreserve a book if it is reserved by user
     :param book_id:
     :param authorization:
-    :return:
+    :return: models.GenericResponse
     """
     authorized_user = await db.authorize(authorization, 'user')
     if not authorized_user:
@@ -287,7 +286,7 @@ async def unreserve_book(book_id: int, authorization: models.Authorization):
         return HTTPException(status_code=403, detail='Book is reserved by another user')
     book.reserved_datetime = 0
     await db.update_book(book)
-    return Response()
+    return models.GenericResponse(result=True)
 
 """
 Methods without authorization
@@ -298,7 +297,7 @@ Methods without authorization
 async def get_books():
     """
     Gives all books
-    :return: list of Book objects
+    :return: list[models.Book]
     """
     books = await db.search_books()
     return books
@@ -309,11 +308,12 @@ async def get_book(book_id: int):
     """
     Get book by its id
     :param book_id:
-    :return: Book object
+    :return: models.Book
     """
     book = await db.get_book_by_id(book_id=book_id)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
+    return book
 
 
 @app.get('/api/books/genre/{genre_id}', response_model=list[models.Book])

@@ -151,3 +151,7 @@ class BookGiveTransaction(BaseModel):
 class BookGetTransaction(BaseModel):
     authorization: Authorization
     book_id: int
+
+
+class GenericResponse(BaseModel):
+    result: bool
