@@ -1,23 +1,27 @@
+import smtplib
 import time
-import fastapi
-import uvicorn
-
 from fastapi import FastAPI, HTTPException, Response
 import db
 import models
+import settings
+import utils
 
 app = FastAPI()
+email_controller = smtplib.SMTP(settings.EMAIL_DOMEN_NAME, settings.EMAIL_PORT)
 
 
 @app.on_event('startup')
 async def startup():
     await db.database.connect()
     await db.create_tables()
+    email_controller.starttls()
+    email_controller.login(settings.EMAIL_LOGIN, settings.EMAIL_PASSWORD)
 
 
 @app.on_event('shutdown')
 async def shutdown():
     await db.database.disconnect()
+    email_controller.quit()
 
 
 @app.get("/")
@@ -55,6 +59,8 @@ async def create_user(new_user: models.NewUserData):
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.insert_user(new_user)
+    utils.notify_about_account_creation(email_controller, new_user)
+
     return Response()
 
 
@@ -183,7 +189,7 @@ async def delete_book(book_id: int, authorization: models.Authorization):
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.delete_book(book_id)
-    return fastapi.Response()
+    return Response()
 
 
 @app.get('/api/librarian/give_book')
@@ -209,7 +215,7 @@ async def give_book(book_transaction: models.BookGiveTransaction):
     book.in_stock = False
     book.owner_id = user.id
     await db.update_book(book_data=book)
-    return fastapi.Response()
+    return Response()
 
 
 @app.get('/api/librarian/take_book')
@@ -229,7 +235,7 @@ async def take_book(book_transaction: models.BookGetTransaction):
         return HTTPException(status_code=403, detail='Book is already in stock')
     book.in_stock = True
     await db.update_book(book)
-    return fastapi.Response()
+    return Response()
 
 
 """
