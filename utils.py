@@ -1,13 +1,11 @@
-import hashlib
+from passlib.hash import bcrypt
 from smtplib import SMTP
 import settings
 from models import NewUserData
 
 
 def get_password_hash(password: str) -> str:
-    cypher = hashlib.sha256()
-    cypher.update(password.encode('utf8'))
-    password_hash = cypher.hexdigest()
+    password_hash = bcrypt.hash(password)
     return password_hash
 
 

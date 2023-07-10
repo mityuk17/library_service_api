@@ -1,6 +1,7 @@
 from models import *
 import databases.backends.postgres
 from utils import get_password_hash
+from passlib.hash import bcrypt
 
 databases.backends.postgres.Record.__iter__ = lambda self: iter(self._row)
 database = databases.Database(settings.postgre_url)
@@ -14,10 +15,9 @@ async def authorize(authorization: Authorization, required_role: str) -> User:
     :return: models.User
     """
     user = await get_user_by_login(login=authorization.login)
-    password_hash = get_password_hash(authorization.password)
     if not user:
         return False
-    check = (user.password == password_hash) and (user.role == required_role)
+    check = bcrypt.verify(secret=authorization.password, hash=user.password)
     if check:
         return user
 
