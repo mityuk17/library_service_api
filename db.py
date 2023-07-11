@@ -17,7 +17,9 @@ async def authorize(authorization: Authorization, required_role: str) -> User:
     user = await get_user_by_login(login=authorization.login)
     if not user:
         return False
-    check = bcrypt.verify(secret=authorization.password, hash=user.password)
+    if not user.role == required_role:
+        return False
+    check = bcrypt.verify(secret=authorization.password, hash=user.password_hash)
     if check:
         return user
 
@@ -59,19 +61,19 @@ async def create_tables():
 async def get_user_by_id(user_id: int) -> User:
     query = '''SELECT * FROM users WHERE id = :id'''
     result = await database.fetch_one(query=query, values={'id': user_id})
-    return User.from_list(result) if result else None
+    return User.from_orm(result) if result else None
 
 
 async def get_user_by_login(login: str) -> User:
     query = '''SELECT * FROM users WHERE login = :login;'''
     result = await database.fetch_one(query=query, values={'login': login})
-    return User.from_list(result) if result else None
+    return User.from_orm(result) if result else None
 
 
 async def get_users() -> list[User]:
     query = '''SELECT * FROM users;'''
     result = await database.fetch_all(query=query)
-    users = [User.from_list(user_data) for user_data in result]
+    users = [User.from_orm(user_data) for user_data in result]
     return users
 
 
@@ -90,7 +92,7 @@ async def update_user(user_data: User):
     active = :active WHERE id = :id;'''
     values = {'email': user_data.email,
               'login': user_data.login,
-              'password': get_password_hash(user_data.password),
+              'password': get_password_hash(user_data.password_hash),
               'active': user_data.active,
               'id': user_data.id}
     await database.execute(query=query, values=values)
@@ -104,13 +106,13 @@ async def delete_user(user_id: int):
 async def get_book_by_id(book_id: int) -> Book:
     query = '''SELECT * FROM books WHERE id = :id'''
     result = await database.fetch_one(query=query, values={'id': book_id})
-    return Book.from_list(result) if result else None
+    return Book.from_orm(result) if result else None
 
 
 async def get_book_by_name(book_name: str) -> Book:
     query = '''SELECT * FROM books WHERE name = :name'''
     result = await database.fetch_one(query=query, values={'name': book_name})
-    return Book.from_list(result) if result else None
+    return Book.from_orm(result) if result else None
 
 
 async def search_books(filter_name: str = None, filter_value: int = None) -> list[Book]:
@@ -120,7 +122,7 @@ async def search_books(filter_name: str = None, filter_value: int = None) -> lis
     else:
         query = '''SELECT * FROM books;'''
         result = await database.fetch_all(query=query)
-    result = [Book.from_list(item) for item in result]
+    result = [Book.from_orm(item) for item in result]
     return result
 
 
@@ -157,52 +159,43 @@ async def delete_book(book_id: int):
 async def get_genre_by_id(genre_id: int) -> Genre:
     query = '''SELECT * FROM genres WHERE id = :id;'''
     result = await database.fetch_one(query=query, values={'id': genre_id})
-    return Genre.from_list(result) if result else None
+    return Genre.from_orm(result) if result else None
 
 
-async def get_genre_by_name(genre_name: str) -> Genre:
+async def get_or_insert_genre(genre_name: str) -> Genre:
     query = '''SELECT * FROM genres WHERE name = :name;'''
-    result = await database.fetch_one(query=query, values={'name': genre_name})
-    return Genre.from_list(result) if result else None
-
-
-async def insert_genre(name: str) -> Genre:
-    query = '''INSERT INTO genres(name) VALUES (:name);'''
-    await database.execute(query=query, values={'name': name})
-    return await get_genre_by_name(genre_name=name)
+    result = await database.fetch_one(query, values={'name': genre_name})
+    if not result:
+        query = '''INSERT INTO genres (name) VALUES (:name) RETURNING *;'''
+        result = await database.fetch_one(query=query, values={'name': genre_name})
+    return Genre.from_orm(result)
 
 
 async def get_author_by_id(author_id: int) -> Author:
     query = '''SELECT * FROM authors WHERE id = :id;'''
     result = await database.fetch_one(query=query, values={'id': author_id})
-    return Author.from_list(result) if result else None
+    return Author.from_orm(result) if result else None
 
 
-async def get_author_by_name(author_name: str) -> Author:
+async def get_or_insert_author(author_name: str) -> Author:
     query = '''SELECT * FROM authors WHERE name = :name;'''
-    result = await database.fetch_one(query=query, values={'name': author_name})
-    return Author.from_list(result) if result else None
-
-
-async def insert_author(name: str) -> Author:
-    query = '''INSERT INTO authors(name) VALUES (:name);'''
-    await database.execute(query=query, values={'name': name})
-    return await get_author_by_name(author_name=name)
+    result = await database.fetch_one(query, values={'name': author_name})
+    if not result:
+        query = '''INSERT INTO authors (name) VALUES (:name) RETURNING *;'''
+        result = await database.fetch_one(query=query, values={'name': author_name})
+    return Author.from_orm(result)
 
 
 async def get_publisher_by_id(publisher_id: int) -> Publisher:
     query = '''SELECT * FROM publishers WHERE id = :id;'''
     result = await database.fetch_one(query=query, values={'id': publisher_id})
-    return Genre.from_list(result) if result else None
+    return Publisher.from_orm(result) if result else None
 
 
-async def get_publisher_by_name(publisher_name: str) -> Publisher:
+async def get_or_insert_publisher(publisher_name: str) -> Publisher:
     query = '''SELECT * FROM publishers WHERE name = :name;'''
-    result = await database.fetch_one(query=query, values={'name': publisher_name})
-    return Genre.from_list(result) if result else None
-
-
-async def insert_publisher(name: str) -> Publisher:
-    query = '''INSERT INTO publishers(name) VALUES (:name);'''
-    await database.execute(query=query, values={'name': name})
-    return await get_publisher_by_name(publisher_name=name)
+    result = await database.fetch_one(query, values={'name': publisher_name})
+    if not result:
+        query = '''INSERT INTO publishers (name) VALUES (:name) RETURNING *;'''
+        result = await database.fetch_one(query=query, values={'name': publisher_name})
+    return Publisher.from_orm(result)

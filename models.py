@@ -1,5 +1,7 @@
 import time
+
 from pydantic import BaseModel
+
 import settings
 
 """
@@ -11,27 +13,24 @@ class Genre(BaseModel):
     id: int
     name: str
 
-    @classmethod
-    def from_list(cls, list_data: list):
-        return Genre(id=list_data[0], name=list_data[1])
+    class Config:
+        orm_mode = True
 
 
 class Author(BaseModel):
     id: int
     name: str
 
-    @classmethod
-    def from_list(cls, list_data: list):
-        return Author(id=list_data[0], name=list_data[1])
+    class Config:
+        orm_mode = True
 
 
 class Publisher(BaseModel):
     id: int
     name: str
 
-    @classmethod
-    def from_list(cls, list_data: list):
-        return Publisher(id=list_data[0], name=list_data[1])
+    class Config:
+        orm_mode = True
 
 
 class Authorization(BaseModel):
@@ -73,26 +72,8 @@ class Book(BaseModel):
     in_stock: bool
     owner_id: int
 
-    @classmethod
-    def from_list(cls, book_data: list):
-        book = Book(id=book_data[0], name=book_data[1], author_id=book_data[2], publisher_id=book_data[3],
-                    genre_id=book_data[4], reserved_datetime=book_data[4], in_stock=book_data[5], owner_id=book_data[6])
-        return book
-
-    @classmethod
-    def from_dict(cls, book_data: dict):
-        book_id = book_data.get('id')
-        name = book_data.get('name')
-        author_id = book_data.get('author_id')
-        publisher_id = book_data.get('publisher_id')
-        genre_id = book_data.get('genre_id')
-        reserved_datetime = book_data.get('reserved_datetime')
-        reserved_user_id = book_data.get('reserved_user_id')
-        in_stock = book_data.get('in_stock')
-        owner_id = book_data.get('owner_id')
-        return Book(id=book_id, name=name, author_id=author_id, publisher_id=publisher_id, genre_id=genre_id,
-                    reserved_datetime=reserved_datetime, reserved_user_id=reserved_user_id, in_stock=in_stock,
-                    owner_id=owner_id)
+    class Config:
+        orm_mode = True
 
     def is_reserved(self):
         return self.reserved_datetime + settings.reservation_time > time.time()
@@ -102,25 +83,12 @@ class User(BaseModel):
     id: int
     email: str
     login: str
-    password: str
+    password_hash: str
     role: str
     active: bool
 
-    @classmethod
-    def from_list(cls, user_data: list):
-        user = cls(id=user_data[0], email=user_data[1], login=user_data[2], password=user_data[3],
-                   role=user_data[4], active=user_data[5])
-        return user
-
-    @classmethod
-    def from_dict(cls, user_data: dict):
-        user_id = user_data.get('id')
-        email = user_data.get('email')
-        login = user_data.get('login')
-        password = user_data.get('password')
-        role = user_data.get('role')
-        active = user_data.get('active')
-        return cls(id=user_id, email=email, login=login, password=password, role=role, active=active)
+    class Config:
+        orm_mode = True
 
 
 class NewUserData(BaseModel):

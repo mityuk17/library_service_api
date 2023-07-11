@@ -1,19 +1,20 @@
 import smtplib
 import time
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException
 import db
 import models
 import settings
 import utils
 
 app = FastAPI()
-email_controller = smtplib.SMTP(settings.EMAIL_DOMEN_NAME, settings.EMAIL_PORT)
+email_controller = smtplib.SMTP()
 
 
 @app.on_event('startup')
 async def startup():
     await db.database.connect()
     await db.create_tables()
+    email_controller.connect(settings.EMAIL_DOMEN_NAME, settings.EMAIL_PORT)
     email_controller.starttls()
     email_controller.login(settings.EMAIL_LOGIN, settings.EMAIL_PASSWORD)
 
@@ -76,7 +77,7 @@ async def change_user_data(updated_user_data: models.UpdatedUserData):
     user = await db.get_user_by_id(updated_user_data.id)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
-    updated_user = models.User.from_dict(user.dict() | updated_user_data.dict())
+    updated_user = models.User(**(user.dict() | updated_user_data.dict()))
     await db.update_user(updated_user)
     return models.GenericResponse(result=True)
 
@@ -128,12 +129,9 @@ async def create_book(new_book: models.NewBookData):
     authorized_user = await db.authorize(new_book.authorization, 'librarian')
     if not authorized_user:
         return HTTPException(status_code=401)
-    author = await db.get_author_by_name(author_name=new_book.author)
-    author = author if author else await db.insert_author(new_book.author)
-    genre = await db.get_genre_by_name(genre_name=new_book.genre)
-    genre = genre if genre else await db.insert_genre(new_book.genre)
-    publisher = await db.get_publisher_by_name(publisher_name=new_book.publisher)
-    publisher = publisher if publisher else await db.insert_publisher(new_book.publisher)
+    author = await db.get_or_insert_author(author_name=new_book.author)
+    genre = await db.get_or_insert_genre(genre_name=new_book.genre)
+    publisher = await db.get_or_insert_publisher(publisher_name=new_book.publisher)
     new_book.author_id = author.id
     new_book.genre_id = genre.id
     new_book.publisher_id = publisher.id
@@ -154,7 +152,7 @@ async def change_book_data(updated_book_data: models.UpdatedBookData):
     book = await db.get_book_by_id(updated_book_data.id)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
-    updated_book = models.Book.from_dict(book.dict() | updated_book_data.dict())
+    updated_book = models.Book(**(book.dict() | updated_book_data.dict()))
     await db.update_book(updated_book)
     return models.GenericResponse(result=True)
 
