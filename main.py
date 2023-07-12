@@ -32,7 +32,7 @@ Admin methods
 async def get_users(authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Get information about all users
-    :param session:
+    :param session: Connection object
     :param authorization: login, password
     :return: users list[User]
     """
@@ -47,7 +47,7 @@ async def get_users(authorization: models.Authorization, session: Connection = D
 async def create_user(new_user: models.NewUserData, session: Connection = Depends(db.get_session)):
     """
     Creates a new user
-    :param session:
+    :param session: Connection object
     :param new_user: admin_authorization(models.Authorization) and new user data
     :return: models.GenericResponse
     """
@@ -63,7 +63,7 @@ async def create_user(new_user: models.NewUserData, session: Connection = Depend
 async def change_user_data(updated_user_data: models.UpdatedUserData, session: Connection = Depends(db.get_session)):
     """
     Updates User's fields' values
-    :param session:
+    :param session: Connection object
     :param updated_user_data: authorization(models.Authorization) and updated user data
     :return: models.GenericResponse
     """
@@ -83,7 +83,7 @@ async def get_user_info(user_id: int, authorization: models.Authorization,
                         session: Connection = Depends(db.get_session)):
     """
     Gets user information by id
-    :param session:
+    :param session: Connection object
     :param user_id:
     :param authorization: login and password
     :return: models.User
@@ -101,7 +101,7 @@ async def get_user_info(user_id: int, authorization: models.Authorization,
 async def delete_user(user_id: int, authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Deletes user from database
-    :param session:
+    :param session: Connection object
     :param user_id:
     :param authorization: login and password
     :return: models.GenericResponse
@@ -122,7 +122,7 @@ Librarian methods
 async def create_book(new_book: models.NewBookData, session: Connection = Depends(db.get_session)):
     """
     Creates new book
-    :param session:
+    :param session: Connection object
     :param new_book: authorization and new book data
     :return: models.GenericResponse
     """
@@ -143,7 +143,7 @@ async def create_book(new_book: models.NewBookData, session: Connection = Depend
 async def change_book_data(updated_book_data: models.UpdatedBookData, session: Connection = Depends(db.get_session)):
     """
     Changes Book object's fields' values
-    :param session:
+    :param session: Connection object
     :param updated_book_data: authorization and updated book data
     :return: models.GenericResponse
     """
@@ -163,7 +163,7 @@ async def get_book_info(book_id: int, authorization: models.Authorization,
                         session: Connection = Depends(db.get_session)):
     """
     Get book by id
-    :param session:
+    :param session: Connection object
     :param book_id:
     :param authorization: login and password
     :return: models.Book
@@ -181,7 +181,7 @@ async def get_book_info(book_id: int, authorization: models.Authorization,
 async def delete_book(book_id: int, authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Delete book from database
-    :param session:
+    :param session: Connection object
     :param book_id:
     :param authorization: login and password
     :return: models.GenericResponse
@@ -197,7 +197,7 @@ async def delete_book(book_id: int, authorization: models.Authorization, session
 async def give_book(book_transaction: models.BookGiveTransaction, session: Connection = Depends(db.get_session)):
     """
     Makes book unavailable for reserving of taking by users
-    :param session:
+    :param session: Connection object
     :param book_transaction: authorization, book_id, user_id
     :return: models.GenericResponse
     """
@@ -224,7 +224,7 @@ async def give_book(book_transaction: models.BookGiveTransaction, session: Conne
 async def take_book(book_transaction: models.BookGetTransaction, session: Connection = Depends(db.get_session)):
     """
     Makes book available for reserving and taking by users
-    :param session:
+    :param session: Connection object
     :param book_transaction: authorization, book_id)
     :return: models.GenericResponse
     """
@@ -251,7 +251,7 @@ async def reserve_book(book_id: int, authorization: models.Authorization,
                        session: Connection = Depends(db.get_session)):
     """
     Reserves book and make it unavailable to reserve or take it by other users
-    :param session:
+    :param session: Connection object
     :param book_id:
     :param authorization: login and password
     :return: models.GenericResponse
@@ -277,7 +277,7 @@ async def unreserve_book(book_id: int, authorization: models.Authorization,
                          session: Connection = Depends(db.get_session)):
     """
     Unreserve a book if it is reserved by user
-    :param session:
+    :param session: Connection object
     :param book_id:
     :param authorization:
     :return: models.GenericResponse
@@ -315,7 +315,7 @@ async def get_books(session: Connection = Depends(db.get_session)):
 async def get_book(book_id: int, session: Connection = Depends(db.get_session)):
     """
     Get book by its id
-    :param session:
+    :param session: Connection object
     :param book_id:
     :return: models.Book
     """
@@ -329,7 +329,7 @@ async def get_book(book_id: int, session: Connection = Depends(db.get_session)):
 async def search_books_by_genre(genre_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by genre
-    :param session:
+    :param session: Connection object
     :param genre_id:
     :return: list of Book objects
     """
@@ -344,7 +344,7 @@ async def search_books_by_genre(genre_id: int, session: Connection = Depends(db.
 async def search_books_by_publisher(publisher_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by publisher
-    :param session:
+    :param session: Connection object
     :param publisher_id:
     :return: list of Book objects
     """
@@ -359,7 +359,7 @@ async def search_books_by_publisher(publisher_id: int, session: Connection = Dep
 async def search_books_by_author(author_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by author
-    :param session:
+    :param session: Connection object
     :param author_id:
     :return: list of Book objects
     """
