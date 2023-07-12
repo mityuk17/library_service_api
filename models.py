@@ -66,9 +66,9 @@ class Book(BaseModel):
     publisher_id: int
     genre_id: int
     reserved_datetime: int
-    reserved_user_id: int
+    reserved_user_id: int = None
     in_stock: bool
-    owner_id: int
+    owner_id: int = None
 
     class Config:
         orm_mode = True
@@ -87,6 +87,9 @@ class User(BaseModel):
 
     class Config:
         orm_mode = True
+
+    def check_role(self, required_role):
+        return self.role == required_role
 
 
 class NewUserData(BaseModel):

@@ -34,7 +34,7 @@ def send_email_to_user(user_email: str, message: str):
     email_controller.quit()
 
 
-def verify_password(pwd_context, plain_password, hashed_password):
+def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -42,7 +42,7 @@ async def authenticate_user(login: str, password: str, session: Connection) -> m
     user = await db.get_user_by_login(login, session)
     if not user:
         return False
-    if not verify_password(pwd_context, password, user.password_hash):
+    if not verify_password(password, user.password_hash):
         return False
     return user
 
@@ -55,8 +55,6 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
-
-
-
-
-
+def unite_dicts(main_dict: dict, new_dict: dict) -> dict:
+    new_dict = {item: new_dict.get(item) for item in new_dict if new_dict.get(item) is not None}
+    return main_dict | new_dict

@@ -89,14 +89,14 @@ async def get_users(session: Connection) -> list[User]:
 async def insert_user(user_data: NewUserData, session: Connection):
     query = '''INSERT INTO users(email, login, password_hash, role) VALUES 
     (:email, :login, :password, :role);'''
-    values = dict(user_data)
+    values = user_data.dict()
     await session.execute(query=query, values=values)
 
 
 async def update_user(user_data: User, session: Connection):
-    query = '''UPDATE users SET email = :email, login = :login, password_hash = :password,
-    active = :active WHERE id = :id;'''
-    values = dict(user_data)
+    query = '''UPDATE users SET email = :email, login = :login, password_hash = :password_hash,
+    active = :active, role = :role WHERE id = :id;'''
+    values = user_data.dict()
     await session.execute(query=query, values=values)
 
 
@@ -132,13 +132,14 @@ async def insert_book(book_data: NewBookData, session: Connection):
     query = '''INSERT INTO books(name, author_id, publisher_id, genre_id) 
     VALUES(:name, :author_id, :publisher_id, :genre_id);'''
     values = dict(book_data)
+    del values['author'], values['publisher'], values['genre']
     await session.execute(query=query, values=values)
 
 
 async def update_book(book_data: Book, session: Connection):
-    query = '''UPDATE books SET reserved_datetime = :reserved_datetime, reserver_id = :reserver_id,
+    query = '''UPDATE books SET name = :name, author_id = :author_id, publisher_id = :publisher_id, genre_id = :genre_id, reserved_datetime = :reserved_datetime, reserver_id = :reserved_user_id,
     in_stock = :in_stock, owner_id = :owner_id WHERE id = :id;'''
-    values = dict(book_data)
+    values = book_data.dict()
     await session.execute(query=query, values=values)
 
 
