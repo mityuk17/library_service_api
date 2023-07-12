@@ -1,33 +1,22 @@
-import smtplib
 import time
 from fastapi import FastAPI, HTTPException
 import db
 import models
-import settings
 import utils
 
+
 app = FastAPI()
-email_controller = smtplib.SMTP()
 
 
 @app.on_event('startup')
 async def startup():
     await db.database.connect()
     await db.create_tables()
-    email_controller.connect(settings.EMAIL_DOMEN_NAME, settings.EMAIL_PORT)
-    email_controller.starttls()
-    email_controller.login(settings.EMAIL_LOGIN, settings.EMAIL_PASSWORD)
 
 
 @app.on_event('shutdown')
 async def shutdown():
     await db.database.disconnect()
-    email_controller.quit()
-
-
-@app.get("/")
-async def root():
-    return {"status": "OK"}
 
 
 """
@@ -60,7 +49,7 @@ async def create_user(new_user: models.NewUserData):
     if not authorized_user:
         return HTTPException(status_code=401)
     await db.insert_user(new_user)
-    utils.notify_about_account_creation(email_controller, new_user)
+    utils.notify_about_account_creation(new_user)
     return models.GenericResponse(result=True)
 
 
