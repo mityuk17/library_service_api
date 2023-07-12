@@ -1,5 +1,8 @@
+import sys
 import time
-from fastapi import FastAPI, HTTPException
+from databases.core import Connection
+from asyncpg import PostgresError
+from fastapi import FastAPI, HTTPException, Depends
 import db
 import models
 import utils
@@ -10,13 +13,14 @@ app = FastAPI()
 
 @app.on_event('startup')
 async def startup():
-    await db.database.connect()
-    await db.create_tables()
-
-
-@app.on_event('shutdown')
-async def shutdown():
-    await db.database.disconnect()
+    try:
+        async for session in db.get_session():
+            check = await session.fetch_one("SELECT 1;")
+            await db.create_tables(session)
+            print(check)
+    except PostgresError:
+        print("DB connection error")
+        sys.exit(1)
 
 
 """
@@ -25,81 +29,87 @@ Admin methods
 
 
 @app.get('/api/admin/users', response_model=list[models.User])
-async def get_users(authorization: models.Authorization):
+async def get_users(authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Get information about all users
+    :param session:
     :param authorization: login, password
     :return: users list[User]
     """
-    authorized_user = await db.authorize(authorization, 'admin')
+    authorized_user = await db.authorize(authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    users = await db.get_users()
+    users = await db.get_users(session)
     return users
 
 
 @app.post('/api/admin/users', response_model=models.GenericResponse)
-async def create_user(new_user: models.NewUserData):
+async def create_user(new_user: models.NewUserData, session: Connection = Depends(db.get_session)):
     """
     Creates a new user
+    :param session:
     :param new_user: admin_authorization(models.Authorization) and new user data
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(new_user.authorization, 'admin')
+    authorized_user = await db.authorize(new_user.authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    await db.insert_user(new_user)
+    await db.insert_user(new_user, session)
     utils.notify_about_account_creation(new_user)
     return models.GenericResponse(result=True)
 
 
 @app.put('/api/admin/users', response_model=models.GenericResponse)
-async def change_user_data(updated_user_data: models.UpdatedUserData):
+async def change_user_data(updated_user_data: models.UpdatedUserData, session: Connection = Depends(db.get_session)):
     """
     Updates User's fields' values
+    :param session:
     :param updated_user_data: authorization(models.Authorization) and updated user data
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(updated_user_data.authorization, 'admin')
+    authorized_user = await db.authorize(updated_user_data.authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    user = await db.get_user_by_id(updated_user_data.id)
+    user = await db.get_user_by_id(updated_user_data.id, session)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
     updated_user = models.User(**(user.dict() | updated_user_data.dict()))
-    await db.update_user(updated_user)
+    await db.update_user(updated_user, session)
     return models.GenericResponse(result=True)
 
 
 @app.get('/api/admin/users/{user_id}', response_model=models.User)
-async def get_user_info(user_id: int, authorization: models.Authorization):
+async def get_user_info(user_id: int, authorization: models.Authorization,
+                        session: Connection = Depends(db.get_session)):
     """
     Gets user information by id
+    :param session:
     :param user_id:
     :param authorization: login and password
     :return: models.User
     """
-    authorized_user = await db.authorize(authorization, 'admin')
+    authorized_user = await db.authorize(authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    user = await db.get_user_by_id(user_id)
+    user = await db.get_user_by_id(user_id, session)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
     return user
 
 
 @app.delete('/api/admin/users/{user_id}', response_model=models.GenericResponse)
-async def delete_user(user_id: int, authorization: models.Authorization):
+async def delete_user(user_id: int, authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Deletes user from database
+    :param session:
     :param user_id:
     :param authorization: login and password
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(authorization, 'admin')
+    authorized_user = await db.authorize(authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    await db.delete_user(user_id)
+    await db.delete_user(user_id, session)
     return models.GenericResponse(result=True)
 
 
@@ -109,89 +119,95 @@ Librarian methods
 
 
 @app.post('/api/librarian/books', response_model=models.GenericResponse)
-async def create_book(new_book: models.NewBookData):
+async def create_book(new_book: models.NewBookData, session: Connection = Depends(db.get_session)):
     """
     Creates new book
+    :param session:
     :param new_book: authorization and new book data
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(new_book.authorization, 'librarian')
+    authorized_user = await db.authorize(new_book.authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    author = await db.get_or_insert_author(author_name=new_book.author)
-    genre = await db.get_or_insert_genre(genre_name=new_book.genre)
-    publisher = await db.get_or_insert_publisher(publisher_name=new_book.publisher)
+    author = await db.get_or_insert_author(new_book.author, session)
+    genre = await db.get_or_insert_genre(new_book.genre, session)
+    publisher = await db.get_or_insert_publisher(new_book.publisher, session)
     new_book.author_id = author.id
     new_book.genre_id = genre.id
     new_book.publisher_id = publisher.id
-    await db.insert_book(new_book)
+    await db.insert_book(new_book, session)
     return models.GenericResponse(result=True)
 
 
 @app.put('/api/librarian/books', response_model=models.GenericResponse)
-async def change_book_data(updated_book_data: models.UpdatedBookData):
+async def change_book_data(updated_book_data: models.UpdatedBookData, session: Connection = Depends(db.get_session)):
     """
     Changes Book object's fields' values
+    :param session:
     :param updated_book_data: authorization and updated book data
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(updated_book_data.authorization, 'librarian')
+    authorized_user = await db.authorize(updated_book_data.authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(updated_book_data.id)
+    book = await db.get_book_by_id(updated_book_data.id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     updated_book = models.Book(**(book.dict() | updated_book_data.dict()))
-    await db.update_book(updated_book)
+    await db.update_book(updated_book, session)
     return models.GenericResponse(result=True)
 
 
 @app.get('/api/librarian/books/{book_id}', response_model=models.Book)
-async def get_book_info(book_id: int, authorization: models.Authorization):
+async def get_book_info(book_id: int, authorization: models.Authorization,
+                        session: Connection = Depends(db.get_session)):
     """
     Get book by id
+    :param session:
     :param book_id:
     :param authorization: login and password
     :return: models.Book
     """
-    authorized_user = await db.authorize(authorization, 'librarian')
+    authorized_user = await db.authorize(authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(book_id=book_id)
+    book = await db.get_book_by_id(book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     return book
 
 
 @app.delete('/api/librarian/books/{book_id}', response_model=models.GenericResponse)
-async def delete_book(book_id: int, authorization: models.Authorization):
+async def delete_book(book_id: int, authorization: models.Authorization, session: Connection = Depends(db.get_session)):
     """
     Delete book from database
+    :param session:
     :param book_id:
     :param authorization: login and password
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(authorization, 'librarian')
+    authorized_user = await db.authorize(authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    await db.delete_book(book_id)
+    await db.delete_book(book_id, session)
     return models.GenericResponse(result=True)
 
 
 @app.get('/api/librarian/give_book', response_model=models.GenericResponse)
-async def give_book(book_transaction: models.BookGiveTransaction):
+async def give_book(book_transaction: models.BookGiveTransaction, session: Connection = Depends(db.get_session)):
     """
     Makes book unavailable for reserving of taking by users
+    :param session:
     :param book_transaction: authorization, book_id, user_id
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
+    authorized_user = await db.authorize(book_transaction.authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(book_transaction.book_id)
+    book = await db.get_book_by_id(book_transaction.book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
-    user = await db.get_user_by_id(book_transaction.user_id)
+    user = await db.get_user_by_id(book_transaction.user_id, session)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
     if book.is_reserved() and book.reserved_user_id != user.id:
@@ -200,27 +216,28 @@ async def give_book(book_transaction: models.BookGiveTransaction):
         return HTTPException(status_code=403, detail='Book is not in stock')
     book.in_stock = False
     book.owner_id = user.id
-    await db.update_book(book_data=book)
+    await db.update_book(book, session)
     return models.GenericResponse(result=True)
 
 
 @app.get('/api/librarian/take_book', response_model=models.GenericResponse)
-async def take_book(book_transaction: models.BookGetTransaction):
+async def take_book(book_transaction: models.BookGetTransaction, session: Connection = Depends(db.get_session)):
     """
     Makes book available for reserving and taking by users
+    :param session:
     :param book_transaction: authorization, book_id)
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(book_transaction.authorization, 'librarian')
+    authorized_user = await db.authorize(book_transaction.authorization, 'librarian', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(book_transaction.book_id)
+    book = await db.get_book_by_id(book_transaction.book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     if book.in_stock:
         return HTTPException(status_code=403, detail='Book is already in stock')
     book.in_stock = True
-    await db.update_book(book)
+    await db.update_book(book, session)
     return models.GenericResponse(result=True)
 
 
@@ -230,17 +247,19 @@ User methods
 
 
 @app.get('/api/reserve_book/{book_id}', response_model=models.GenericResponse)
-async def reserve_book(book_id: int, authorization: models.Authorization):
+async def reserve_book(book_id: int, authorization: models.Authorization,
+                       session: Connection = Depends(db.get_session)):
     """
     Reserves book and make it unavailable to reserve or take it by other users
+    :param session:
     :param book_id:
     :param authorization: login and password
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(authorization, 'user')
+    authorized_user = await db.authorize(authorization, 'user', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(book_id=book_id)
+    book = await db.get_book_by_id(book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     if book.is_reserved():
@@ -249,22 +268,24 @@ async def reserve_book(book_id: int, authorization: models.Authorization):
         return HTTPException(status_code=403, detail='Book is not in stock')
     book.reserved_datetime = int(time.time())
     book.reserved_user_id = authorized_user.id
-    await db.update_book(book)
+    await db.update_book(book, session)
     return models.GenericResponse
 
 
 @app.get('/api/unreserve_book/{book_id}', response_model=models.GenericResponse)
-async def unreserve_book(book_id: int, authorization: models.Authorization):
+async def unreserve_book(book_id: int, authorization: models.Authorization,
+                         session: Connection = Depends(db.get_session)):
     """
     Unreserve a book if it is reserved by user
+    :param session:
     :param book_id:
     :param authorization:
     :return: models.GenericResponse
     """
-    authorized_user = await db.authorize(authorization, 'user')
+    authorized_user = await db.authorize(authorization, 'user', session)
     if not authorized_user:
         return HTTPException(status_code=401)
-    book = await db.get_book_by_id(book_id)
+    book = await db.get_book_by_id(book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     if not book.is_reserved():
@@ -272,7 +293,7 @@ async def unreserve_book(book_id: int, authorization: models.Authorization):
     if book.is_reserved() and book.reserved_user_id != authorized_user.id:
         return HTTPException(status_code=403, detail='Book is reserved by another user')
     book.reserved_datetime = 0
-    await db.update_book(book)
+    await db.update_book(book, session)
     return models.GenericResponse(result=True)
 
 """
@@ -281,65 +302,69 @@ Methods without authorization
 
 
 @app.get('/api/books', response_model=list[models.Book])
-async def get_books():
+async def get_books(session: Connection = Depends(db.get_session)):
     """
     Gives all books
     :return: list[models.Book]
     """
-    books = await db.search_books()
+    books = await db.search_books(session)
     return books
 
 
 @app.get('/api/books/{book_id}', response_model=models.Book)
-async def get_book(book_id: int):
+async def get_book(book_id: int, session: Connection = Depends(db.get_session)):
     """
     Get book by its id
+    :param session:
     :param book_id:
     :return: models.Book
     """
-    book = await db.get_book_by_id(book_id=book_id)
+    book = await db.get_book_by_id(book_id, session)
     if not book:
         return HTTPException(status_code=404, detail='Book not found')
     return book
 
 
 @app.get('/api/books/genre/{genre_id}', response_model=list[models.Book])
-async def search_books_by_genre(genre_id: int):
+async def search_books_by_genre(genre_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by genre
+    :param session:
     :param genre_id:
     :return: list of Book objects
     """
-    genre = await db.get_genre_by_id(genre_id=genre_id)
+    genre = await db.get_genre_by_id(genre_id, session)
     if not genre:
         return HTTPException(status_code=404, detail='Genre not found')
-    books = await db.search_books(filter_name='genre_id', filter_value=genre.id)
+    books = await db.search_books(filter_name='genre_id', filter_value=genre.id, session=session)
     return books
 
 
 @app.get('/api/books/publisher/{publisher_id}', response_model=list[models.Book])
-async def search_books_by_publisher(publisher_id: int):
+async def search_books_by_publisher(publisher_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by publisher
+    :param session:
     :param publisher_id:
     :return: list of Book objects
     """
-    publisher = await db.get_publisher_by_id(publisher_id=publisher_id)
+    publisher = await db.get_publisher_by_id(publisher_id, session)
     if not publisher:
         return HTTPException(status_code=404, detail='Publisher not found')
-    books = await db.search_books(filter_name='publisher_id', filter_value=publisher.id)
+    books = await db.search_books(filter_name='publisher_id', filter_value=publisher.id, session=session)
     return books
 
 
 @app.get('/api/books/author/{author_id}', response_model=list[models.Book])
-async def search_books_by_author(author_id: int):
+async def search_books_by_author(author_id: int, session: Connection = Depends(db.get_session)):
     """
     Gets books specified by author
+    :param session:
     :param author_id:
     :return: list of Book objects
     """
-    author = await db.get_author_by_id(author_id=author_id)
+    author = await db.get_author_by_id(author_id, session)
     if not author:
         return HTTPException(status_code=404, detail='Publisher not found')
-    books = await db.search_books(filter_name='author_id', filter_value=author.id)
+    books = await db.search_books(filter_name='author_id', filter_value=author.id, session=session)
     return books

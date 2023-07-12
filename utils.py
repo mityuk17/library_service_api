@@ -26,3 +26,4 @@ def send_email_to_user(user_email: str, message: str):
     email_controller.quit()
 
 
+
