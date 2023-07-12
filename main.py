@@ -3,12 +3,30 @@ import time
 from databases.core import Connection
 from asyncpg import PostgresError
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import jwt
 import db
 import models
+import settings
 import utils
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme), session: Connection = Depends(db.get_session)):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        login = payload.get("sub")
+        if login is None:
+            return
+    except jwt.exceptions.PyJWTError:
+        return
+    user = await db.get_user_by_login(login, session)
+    if user is None:
+        return
+    return user
 
 
 @app.on_event('startup')
@@ -29,14 +47,13 @@ Admin methods
 
 
 @app.get('/api/admin/users', response_model=list[models.User])
-async def get_users(authorization: models.Authorization, session: Connection = Depends(db.get_session)):
+async def get_users(authorized_user: models.User = Depends(get_current_user), session: Connection = Depends(db.get_session)):
     """
     Get information about all users
+    :param authorized_user:
     :param session: Connection object
-    :param authorization: login, password
     :return: users list[User]
     """
-    authorized_user = await db.authorize(authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
     users = await db.get_users(session)
@@ -54,6 +71,7 @@ async def create_user(new_user: models.NewUserData, session: Connection = Depend
     authorized_user = await db.authorize(new_user.authorization, 'admin', session)
     if not authorized_user:
         return HTTPException(status_code=401)
+    new_user.password = utils.get_password_hash(new_user.password)
     await db.insert_user(new_user, session)
     utils.notify_about_account_creation(new_user)
     return models.GenericResponse(result=True)
@@ -73,6 +91,8 @@ async def change_user_data(updated_user_data: models.UpdatedUserData, session: C
     user = await db.get_user_by_id(updated_user_data.id, session)
     if not user:
         return HTTPException(status_code=404, detail='User not found')
+    if updated_user_data.password:
+        updated_user_data.password = utils.get_password_hash(updated_user_data.password)
     updated_user = models.User(**(user.dict() | updated_user_data.dict()))
     await db.update_user(updated_user, session)
     return models.GenericResponse(result=True)
@@ -368,3 +388,14 @@ async def search_books_by_author(author_id: int, session: Connection = Depends(d
         return HTTPException(status_code=404, detail='Publisher not found')
     books = await db.search_books(filter_name='author_id', filter_value=author.id, session=session)
     return books
+
+
+@app.post("api/login", response_model=models.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Connection = Depends(db.get_session)):
+    user = await utils.authenticate_user(form_data.username, form_data.password, session)
+    if not user:
+        raise HTTPException(status_code=401)
+    access_token = utils.create_access_token(
+        data={"sub": user.login}
+    )
+    return models.Token(access_token=access_token, token_type='bearer')

@@ -39,7 +39,6 @@ class Authorization(BaseModel):
 
 
 class UpdatedUserData(BaseModel):
-    authorization: Authorization
     id: int
     email: str = None
     login: str = None
@@ -49,7 +48,6 @@ class UpdatedUserData(BaseModel):
 
 
 class UpdatedBookData(BaseModel):
-    authorization: Authorization
     id: int
     name: str = None
     author_id: int = None
@@ -92,7 +90,6 @@ class User(BaseModel):
 
 
 class NewUserData(BaseModel):
-    authorization: Authorization
     email: str
     login: str
     password: str
@@ -100,7 +97,6 @@ class NewUserData(BaseModel):
 
 
 class NewBookData(BaseModel):
-    authorization: Authorization
     name: str
     author: str
     publisher: str
@@ -111,15 +107,18 @@ class NewBookData(BaseModel):
 
 
 class BookGiveTransaction(BaseModel):
-    authorization: Authorization
     user_id: int
     book_id: int
 
 
 class BookGetTransaction(BaseModel):
-    authorization: Authorization
     book_id: int
 
 
 class GenericResponse(BaseModel):
     result: bool
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

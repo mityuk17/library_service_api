@@ -1,10 +1,8 @@
 from typing import AsyncGenerator, Any
-
 from databases.core import Connection, Database
 from settings import postgre_url
 from models import *
 import databases.backends.postgres
-from utils import get_password_hash
 from passlib.hash import bcrypt
 
 databases.backends.postgres.Record.__iter__ = lambda self: iter(self._row)
@@ -91,21 +89,14 @@ async def get_users(session: Connection) -> list[User]:
 async def insert_user(user_data: NewUserData, session: Connection):
     query = '''INSERT INTO users(email, login, password_hash, role) VALUES 
     (:email, :login, :password, :role);'''
-    values = {'email': user_data.email,
-              'login': user_data.login,
-              'password': get_password_hash(user_data.password),
-              'role': user_data.role}
+    values = dict(user_data)
     await session.execute(query=query, values=values)
 
 
 async def update_user(user_data: User, session: Connection):
     query = '''UPDATE users SET email = :email, login = :login, password_hash = :password,
     active = :active WHERE id = :id;'''
-    values = {'email': user_data.email,
-              'login': user_data.login,
-              'password': get_password_hash(user_data.password_hash),
-              'active': user_data.active,
-              'id': user_data.id}
+    values = dict(user_data)
     await session.execute(query=query, values=values)
 
 
@@ -140,25 +131,14 @@ async def search_books(session: Connection, filter_name: str = None, filter_valu
 async def insert_book(book_data: NewBookData, session: Connection):
     query = '''INSERT INTO books(name, author_id, publisher_id, genre_id) 
     VALUES(:name, :author_id, :publisher_id, :genre_id);'''
-    values = {
-        'name': book_data.name,
-        'author_id': book_data.author_id,
-        'publisher_id': book_data.publisher_id,
-        'genre_id': book_data.genre_id
-    }
+    values = dict(book_data)
     await session.execute(query=query, values=values)
 
 
 async def update_book(book_data: Book, session: Connection):
     query = '''UPDATE books SET reserved_datetime = :reserved_datetime, reserver_id = :reserver_id,
     in_stock = :in_stock, owner_id = :owner_id WHERE id = :id;'''
-    values = {
-        'reserved_datetime': book_data.reserved_datetime,
-        'reserver_id': book_data.reserved_user_id,
-        'in_stock': book_data.in_stock,
-        'owner_id': book_data.owner_id,
-        'id': book_data.id
-    }
+    values = dict(book_data)
     await session.execute(query=query, values=values)
 
 
