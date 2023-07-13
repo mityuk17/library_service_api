@@ -73,16 +73,22 @@ async def get_user_by_id(user_id: int, session: Connection) -> User:
     return User.from_orm(result) if result else None
 
 
+async def get_no_password_user_by_id(user_id: int, session: Connection) -> NoPasswordUser:
+    query = '''SELECT id, email, login, role, active FROM users;'''
+    result = await session.fetch_one(query=query, values={'id': user_id})
+    return NoPasswordUser.from_orm(result) if result else None
+
+
 async def get_user_by_login(login: str, session: Connection) -> User:
     query = '''SELECT * FROM users WHERE login = :login;'''
     result = await session.fetch_one(query=query, values={'login': login})
     return User.from_orm(result) if result else None
 
 
-async def get_users(session: Connection) -> list[User]:
-    query = '''SELECT * FROM users;'''
+async def get_users(session: Connection) -> list[NoPasswordUser]:
+    query = '''SELECT id, email, login, role, active FROM users;'''
     result = await session.fetch_all(query=query)
-    users = [User.from_orm(user_data) for user_data in result]
+    users = [NoPasswordUser.from_orm(user_data) for user_data in result]
     return users
 
 

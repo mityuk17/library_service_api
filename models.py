@@ -92,6 +92,17 @@ class User(BaseModel):
         return self.role == required_role
 
 
+class NoPasswordUser(BaseModel):
+    id: int
+    email: str
+    login: str
+    role: str
+    active: bool
+
+    class Config:
+        orm_mode = True
+
+
 class NewUserData(BaseModel):
     email: str
     login: str
