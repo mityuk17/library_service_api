@@ -39,7 +39,6 @@ class Authorization(BaseModel):
 
 
 class UpdatedUserData(BaseModel):
-    authorization: Authorization
     id: int
     email: str = None
     login: str = None
@@ -49,7 +48,6 @@ class UpdatedUserData(BaseModel):
 
 
 class UpdatedBookData(BaseModel):
-    authorization: Authorization
     id: int
     name: str = None
     author_id: int = None
@@ -68,9 +66,9 @@ class Book(BaseModel):
     publisher_id: int
     genre_id: int
     reserved_datetime: int
-    reserved_user_id: int
+    reserved_user_id: int = None
     in_stock: bool
-    owner_id: int
+    owner_id: int = None
 
     class Config:
         orm_mode = True
@@ -90,9 +88,22 @@ class User(BaseModel):
     class Config:
         orm_mode = True
 
+    def check_role(self, required_role):
+        return self.role == required_role
+
+
+class NoPasswordUser(BaseModel):
+    id: int
+    email: str
+    login: str
+    role: str
+    active: bool
+
+    class Config:
+        orm_mode = True
+
 
 class NewUserData(BaseModel):
-    authorization: Authorization
     email: str
     login: str
     password: str
@@ -100,7 +111,6 @@ class NewUserData(BaseModel):
 
 
 class NewBookData(BaseModel):
-    authorization: Authorization
     name: str
     author: str
     publisher: str
@@ -111,15 +121,18 @@ class NewBookData(BaseModel):
 
 
 class BookGiveTransaction(BaseModel):
-    authorization: Authorization
     user_id: int
     book_id: int
 
 
 class BookGetTransaction(BaseModel):
-    authorization: Authorization
     book_id: int
 
 
 class GenericResponse(BaseModel):
     result: bool
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
