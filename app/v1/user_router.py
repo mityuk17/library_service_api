@@ -1,8 +1,9 @@
 from databases.core import Connection
 from fastapi import APIRouter, Depends, HTTPException
-from v1 import utils
-from core.schemas import users_schema, misc_schema
-import core.models.database as db
+from app.v1 import utils
+from app.core.schemas import users_schema
+from app.core.schemas import misc_schema
+import app.core.models.database as db
 from time import time
 
 

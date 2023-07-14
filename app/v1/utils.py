@@ -7,10 +7,9 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from passlib.hash import bcrypt
 from smtplib import SMTP
-from core.schemas import users_schema
-import settings
-import core.models.database as db
-
+from app.core.schemas import users_schema
+import app.core.models.database as db
+from app import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authorization/token")

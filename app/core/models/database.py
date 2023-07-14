@@ -1,7 +1,8 @@
 from typing import AsyncGenerator, Any
 from databases.core import Connection, Database
-from settings import postgre_url
-from core.schemas import books_schema, users_schema, misc_schema
+from app.settings import postgre_url
+from app.core.schemas import users_schema
+from app.core.schemas import books_schema, misc_schema
 import databases.backends.postgres
 from passlib.hash import bcrypt
 

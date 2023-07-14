@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, Sequence, Boolean, null
+from sqlalchemy import create_engine, Column, Integer, String, Sequence, Boolean
 from sqlalchemy.orm import declarative_base
-from settings import postgre_url
+from app.settings import postgre_url
 
 
 engine = create_engine(postgre_url)

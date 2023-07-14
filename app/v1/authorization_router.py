@@ -1,10 +1,9 @@
 from databases.core import Connection
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from core.schemas import misc_schema
-import core.models.database as db
-from v1 import utils
-
+from app.core.schemas import misc_schema
+import app.core.models.database as db
+from app.v1 import utils
 
 router = APIRouter(prefix='/authorization')
 

@@ -1,8 +1,8 @@
 from asyncpg import PostgresError
 from fastapi import FastAPI
-from v1 import admin_router, librarian_router, user_router, books_router, authorization_router
-import core.models.start_database as start_db
-import core.models.database as db
+from app.v1 import admin_router, librarian_router, user_router, books_router, authorization_router
+import app.core.models.start_database as start_db
+import app.core.models.database as db
 import sys
 
 

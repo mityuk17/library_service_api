@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from time import time
-import settings
+from app import settings
 
 
 class UpdatedBookData(BaseModel):

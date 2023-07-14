@@ -1,8 +1,7 @@
 from databases.core import Connection
 from fastapi import APIRouter, Depends, HTTPException
-from core.schemas import books_schema
-import core.models.database as db
-
+from app.core.schemas import books_schema
+import app.core.models.database as db
 
 router = APIRouter(prefix="/api/v1/books")
 
