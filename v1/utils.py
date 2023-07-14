@@ -1,15 +1,19 @@
 from datetime import timedelta, datetime
+from typing import Union
 import jwt
 from databases.core import Connection
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from passlib.hash import bcrypt
 from smtplib import SMTP
-import models
+from core.schemas import users_schema
 import settings
-import db
-from models import NewUserData
+import core.models.database as db
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authorization/token")
 
 
 def get_password_hash(password: str) -> str:
@@ -17,7 +21,7 @@ def get_password_hash(password: str) -> str:
     return password_hash
 
 
-def notify_about_account_creation(user: NewUserData):
+def notify_about_account_creation(user: users_schema.NewUserData):
     msg = f'''Your account has been created
 Data for authorization
 Login: {user.login},
@@ -38,7 +42,7 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def authenticate_user(login: str, password: str, session: Connection) -> models.User:
+async def authenticate_user(login: str, password: str, session: Connection) -> Union[users_schema.User, bool]:
     user = await db.get_user_by_login(login, session)
     if not user:
         return False
@@ -58,3 +62,22 @@ def create_access_token(data: dict) -> str:
 def unite_dicts(main_dict: dict, new_dict: dict) -> dict:
     new_dict = {item: new_dict.get(item) for item in new_dict if new_dict.get(item) is not None}
     return main_dict | new_dict
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme), session: Connection = Depends(db.get_session)):
+    """
+    :param token: JWT
+    :param session: Connection object
+    :return: models.User object
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        login = payload.get("sub")
+        if login is None:
+            return
+    except jwt.exceptions.PyJWTError:
+        return
+    user = await db.get_user_by_login(login, session)
+    if user is None:
+        return
+    return user
