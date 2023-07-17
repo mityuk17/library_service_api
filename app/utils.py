@@ -7,9 +7,10 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from passlib.hash import bcrypt
 from smtplib import SMTP
-from app.core.schemas import users_schema
-import app.core.models.database as db
+from app.schemas import users
 from app import settings
+from app.crud.misc import get_session
+from app.crud.user import get_user_by_login
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authorization/token")
@@ -20,7 +21,7 @@ def get_password_hash(password: str) -> str:
     return password_hash
 
 
-def notify_about_account_creation(user: users_schema.NewUserData):
+def notify_about_account_creation(user: users.NewUserData):
     msg = f'''Your account has been created
 Data for authorization
 Login: {user.login},
@@ -41,8 +42,8 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def authenticate_user(login: str, password: str, session: Connection) -> Union[users_schema.User, bool]:
-    user = await db.get_user_by_login(login, session)
+async def authenticate_user(login: str, password: str, session: Connection) -> Union[users.User, bool]:
+    user = await get_user_by_login(login, session)
     if not user:
         return False
     if not verify_password(password, user.password_hash):
@@ -63,11 +64,11 @@ def unite_dicts(main_dict: dict, new_dict: dict) -> dict:
     return main_dict | new_dict
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme), session: Connection = Depends(db.get_session)):
+async def get_current_user(token: str = Depends(oauth2_scheme), session: Connection = Depends(get_session)):
     """
     :param token: JWT
     :param session: Connection object
-    :return: models.User object
+    :return: schemas.User object
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -76,7 +77,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: Connect
             return
     except jwt.exceptions.PyJWTError:
         return
-    user = await db.get_user_by_login(login, session)
+    user = await get_user_by_login(login, session)
     if user is None:
         return
     return user

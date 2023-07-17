@@ -6,6 +6,7 @@ DB_HOST = os.environ.get('DB_HOST', '0.0.0.0')
 DB_NAME = os.environ.get('DB_NAME', 'postgres')
 DB_PORT = os.environ.get('DB_PORT', 5432)
 postgre_url = f'postgresql://{DB_USER}:{DB_PASSWORD}@db/{DB_NAME}'
+print(postgre_url)
 
 
 """config for emails"""
