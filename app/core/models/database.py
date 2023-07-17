@@ -6,12 +6,12 @@ from app.core.schemas import books_schema, misc_schema
 import databases.backends.postgres
 from passlib.hash import bcrypt
 
+
 databases.backends.postgres.Record.__iter__ = lambda self: iter(self._row)
 
 
 async def get_session() -> AsyncGenerator[Connection, Any]:
     """Return DB session"""
-
     async with Database(postgre_url) as db, db.connection() as conn:
         yield conn
 
