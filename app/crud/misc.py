@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Any, Union
+from typing import AsyncGenerator, Any
 from databases.core import Connection, Database
 from app.settings import postgre_url
 import databases.backends.postgres
@@ -17,7 +17,7 @@ async def get_session() -> AsyncGenerator[Connection, Any]:
 
 
 async def authorize(authorization: miscs.Authorization,
-                    required_role: str, session: Connection) -> Union[users.User, None]:
+                    required_role: str, session: Connection) -> users.User | None:
     """
     Checks equivalence of given password hash and hash from database
     :param session: DB connection session

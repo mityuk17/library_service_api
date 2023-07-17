@@ -1,5 +1,4 @@
 from datetime import timedelta, datetime
-from typing import Union
 import jwt
 from databases.core import Connection
 from fastapi import Depends
@@ -42,12 +41,12 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def authenticate_user(login: str, password: str, session: Connection) -> Union[users.User, bool]:
+async def authenticate_user(login: str, password: str, session: Connection) -> users.User | None:
     user = await get_user_by_login(login, session)
     if not user:
-        return False
+        return
     if not verify_password(password, user.password_hash):
-        return False
+        return
     return user
 
 

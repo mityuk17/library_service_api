@@ -9,6 +9,7 @@ services:
       - db
     ports:
       - "8080:8000"
+    network_mode: host
     volumes:
       - .:/app
     env_file:
@@ -22,6 +23,7 @@ services:
     restart: always
     ports:
       - "9432:5432"
+    network_mode: host
     volumes:
       - /tmp/postgresql:/var/lib/postgresql
       - /tmp/postgresql/data:/var/lib/postgresql/data
